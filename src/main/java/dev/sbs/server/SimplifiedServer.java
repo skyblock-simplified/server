@@ -26,7 +26,7 @@ public class SimplifiedServer {
     }
 
     public static void main(String[] args) {
-        ServerApi.getKeyManager().add(SystemUtil.getEnvPair("HYPIXEL_API_KEY"));
+        ServerApi.getKeyManager().add("HYPIXEL_API_KEY", SystemUtil.getEnv("HYPIXEL_API_KEY"));
         SystemUtil.getEnv("INET6_NETWORK_PREFIX").ifPresent(ServerApi::setInet6NetworkPrefix);
         SpringApplication application = new SpringApplication(SimplifiedServer.class);
         application.setDefaultProperties(
