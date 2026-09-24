@@ -36,7 +36,7 @@ SkyBlock resource definitions. Built on top of the
 - **SkyBlock API proxy** - Profiles, auctions, bazaar, museum, garden, news,
   fire sales, and ended auctions
 - **SkyBlock resource proxy** - Skills, collections, items, and election data
-  (no API key required)
+  (no Hypixel API key needed upstream)
 - **OpenAPI documentation** - Auto-generated API spec at `/v3/api-docs` with
   Scalar UI at the root path
 - **Production-ready** - Virtual threads, response compression, and graceful
@@ -56,11 +56,7 @@ SkyBlock resource definitions. Built on top of the
 
 ```
 HYPIXEL_API_KEY         # Hypixel API key (required for most Hypixel/SkyBlock endpoints)
-DATABASE_HOST           # MariaDB host
-DATABASE_SCHEMA         # MariaDB schema
-DATABASE_PORT           # MariaDB port
-DATABASE_USER           # MariaDB user
-DATABASE_PASSWORD       # MariaDB password
+INET6_NETWORK_PREFIX    # IPv6 CIDR prefix the Mojang proxy rotates within (required by /mojang)
 ```
 
 ### Installation
@@ -199,7 +195,7 @@ Proxy endpoints under `/skyblock/` for SkyBlock-specific data.
 ### Resources
 
 Proxy endpoints under `/resources/` for SkyBlock resource definitions. None of
-these endpoints require an API key.
+them needs a Hypixel API key upstream.
 
 | Method | Path | Description |
 |--------|------|-------------|

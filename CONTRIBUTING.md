@@ -34,8 +34,7 @@ For running the server locally:
 | Requirement | Notes |
 |-------------|-------|
 | Hypixel API key | Required for most Hypixel/SkyBlock endpoints |
-| MariaDB or Docker | For database-backed features |
-| Environment variables | `HYPIXEL_API_KEY`, `DATABASE_HOST`, `DATABASE_SCHEMA`, `DATABASE_PORT`, `DATABASE_USER`, `DATABASE_PASSWORD` |
+| Environment variables | `HYPIXEL_API_KEY`, and `INET6_NETWORK_PREFIX` for the `/mojang` endpoints, which throw without it |
 | `ApiKeyStore` bean | Required while `api.key.authentication.enabled` is `true`, which `ServerConfig.optimized()` sets; keep a local one in `src/main/java/dev/sbs/server/config/LocalApiKeyStoreConfig.java`, which `.gitignore` excludes |
 
 ### Development Setup
