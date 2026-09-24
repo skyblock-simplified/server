@@ -27,7 +27,7 @@ project follows.
 |-------------|---------|-------|
 | [JDK](https://adoptium.net/) | **21+** | Required (virtual threads) |
 | [Git](https://git-scm.com/) | 2.x+ | For cloning and contributing |
-| [IntelliJ IDEA](https://www.jetbrains.com/idea/) | Latest | Recommended IDE (Lombok and Gradle support built-in) |
+| [IntelliJ IDEA](https://www.jetbrains.com/idea/) | Latest | Recommended IDE (Gradle support built-in) |
 
 For running the server locally:
 
@@ -36,6 +36,7 @@ For running the server locally:
 | Hypixel API key | Required for most Hypixel/SkyBlock endpoints |
 | MariaDB or Docker | For database-backed features |
 | Environment variables | `HYPIXEL_API_KEY`, `DATABASE_HOST`, `DATABASE_SCHEMA`, `DATABASE_PORT`, `DATABASE_USER`, `DATABASE_PASSWORD` |
+| `ApiKeyStore` bean | Required while `api.key.authentication.enabled` is `true`, which `ServerConfig.optimized()` sets; keep a local one in `src/main/java/dev/sbs/server/config/LocalApiKeyStoreConfig.java`, which `.gitignore` excludes |
 
 ### Development Setup
 
@@ -49,34 +50,37 @@ For running the server locally:
    cd server
    ```
 
-2. **Clone dependency modules alongside** (for local development)
+2. **Dependency modules**
 
-   This module depends on [server-api](https://github.com/SkyBlock-Simplified/server-api)
-   (`dev.sbs:server-api:0.1.0`) and [minecraft-api](https://github.com/SkyBlock-Simplified/minecraft-api)
-   (`dev.sbs:minecraft-api:0.1.0`). Clone them alongside this repository for
-   local development with Gradle composite builds.
-
-   ```bash
-   cd ..
-   git clone https://github.com/SkyBlock-Simplified/minecraft-api.git
-   git clone https://github.com/SkyBlock-Simplified/server-api.git
-   ```
+   This module depends on the
+   [spring-framework](https://github.com/simplified-dev/spring-framework) server
+   framework (`com.github.simplified-dev:spring-framework`), the
+   [hypixel](https://github.com/simplified-api/hypixel),
+   [mojang](https://github.com/simplified-api/mojang), and
+   [skyblock](https://github.com/simplified-api/skyblock) API modules, the
+   SkyBlock Simplified [api](https://github.com/skyblock-simplified/api) module,
+   and the [client](https://github.com/simplified-dev/client),
+   [gson-extras](https://github.com/simplified-dev/gson-extras), and
+   [manager](https://github.com/simplified-dev/manager) libraries, each declared
+   in `build.gradle.kts` as a JitPack coordinate pinned to a commit. A standalone
+   build resolves them from JitPack. To work on one of them alongside this
+   server, clone it and include it in a Gradle composite build whose
+   `dependencySubstitution` maps its coordinate onto the local project.
 
 3. **Build the project**
 
    The Gradle wrapper is included - no separate Gradle installation is needed.
 
    ```bash
-   cd server
    ./gradlew build
    ```
 
 4. **Open in IntelliJ IDEA**
 
    Open the project root as a Gradle project. IntelliJ will automatically
-   detect the `build.gradle.kts` and import dependencies. Ensure the Lombok
-   plugin is installed and annotation processing is enabled
-   (`Settings > Build > Compiler > Annotation Processors`).
+   detect the `build.gradle.kts` and import dependencies. Ensure annotation
+   processing is enabled (`Settings > Build > Compiler > Annotation Processors`)
+   for the `dev.simplified.annotations` processor.
 
 5. **Verify the setup**
 
@@ -106,9 +110,9 @@ git checkout -b feat/my-feature master
   `Concurrent.newSet()` instead of `new ArrayList`, `new HashMap`, etc.
 - **Annotations** - Use `@NotNull` / `@Nullable` from `org.jetbrains.annotations`
   on all public method parameters and return types.
-- **Lombok** - Use `@Getter`, `@RequiredArgsConstructor`, `@Log4j2`, etc.
-  where appropriate. The logger field is non-static
-  (`lombok.log.fieldIsStatic = false`).
+- **Simplified annotations** - Use `@Getter`, `@NoArgsConstructor`,
+  `@RequiredArgsConstructor`, etc. from `dev.simplified.annotations` where
+  appropriate. This module declares no Lombok dependency.
 - **OpenAPI annotations** - Annotate controllers with `@Tag` (class-level) and
   `@Operation` / `@Parameter` (method-level) from `io.swagger.v3.oas.annotations`.
 
@@ -134,8 +138,9 @@ git checkout -b feat/my-feature master
 - Each controller class maps to a single upstream API domain (Mojang, Hypixel,
   SkyBlock, Resources).
 - Use `@ResponseStatus(HttpStatus.OK)` on all endpoint methods.
-- Delegate to `minecraft-api` Feign clients via private helper methods
-  (`endpoint()`, `proxy()`) rather than injecting Spring beans.
+- Delegate to the upstream Feign contracts through a private `contract()`
+  helper that reads the client or proxy from `ServerApi`, rather than
+  injecting Spring beans.
 - Group related endpoints under a shared `@RequestMapping` base path.
 
 ### Commit Messages
@@ -193,8 +198,8 @@ Tests use JUnit 5 (Jupiter):
   existing endpoints should be discussed in the issue tracker before
   implementation.
 - Adherence to the controller patterns established by existing controllers.
-- Compatibility with the `server-api` framework (error handling, security
-  headers, message converters).
+- Compatibility with the `spring-framework` server framework (error handling,
+  API key security, message converters).
 
 ## Reporting Issues
 
@@ -216,8 +221,9 @@ When reporting a bug, include:
 A brief overview to help you find your way around the codebase:
 
 ```
-src/main/java/dev/sbs/simplifiedserver/
+src/main/java/dev/sbs/server/
 ├── SimplifiedServer.java              # Spring Boot entry point with Gson bean
+├── ServerApi.java                     # Gson, KeyManager, and the upstream clients
 ├── config/
 │   └── OpenApiConfig.java             # OpenAPI metadata (title, description, version)
 └── controller/
@@ -230,10 +236,14 @@ src/main/java/dev/sbs/simplifiedserver/
 ### Key extension points
 
 - **New controller** - Add a `@RestController` in `controller/` with `@Tag`
-  and `@Operation` annotations. Delegate to upstream `minecraft-api` Feign
-  clients.
-- **Custom error body** - Override `ErrorController.buildErrorBody()` from
-  `server-api` to return a project-specific JSON error response type.
+  and `@Operation` annotations. Delegate to the upstream Feign contracts that
+  `ServerApi` holds.
+- **API key store** - Supply an `ApiKeyStore` `@Bean`; spring-framework's
+  `ApiKeySecurityConfig` requires one while `api.key.authentication.enabled` is
+  `true`, and `InMemoryApiKeyStore` is its reference implementation.
+- **Custom error body** - spring-framework's `ErrorResponseWriter.buildBody()`
+  builds the JSON error body, through the `errorResponseWriter` bean that
+  `ServerWebConfig` registers; its `ErrorController` advice is final.
 - **Custom Gson** - The `Gson` `@Bean` in `SimplifiedServer` controls the
   serializer used for all JSON responses. Modify it to customize serialization.
 - **Server tuning** - Replace `ServerConfig.optimized()` with

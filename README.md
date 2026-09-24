@@ -4,7 +4,7 @@ SkyBlock-specific Spring Boot REST server for the
 [SkyBlock Simplified](https://github.com/SkyBlock-Simplified) ecosystem,
 providing proxy endpoints for the Mojang API, Hypixel API, SkyBlock API, and
 SkyBlock resource definitions. Built on top of the
-[server-api](https://github.com/SkyBlock-Simplified/server-api) framework.
+[spring-framework](https://github.com/simplified-dev/spring-framework) server framework.
 
 ## Table of Contents
 
@@ -39,8 +39,9 @@ SkyBlock resource definitions. Built on top of the
   (no API key required)
 - **OpenAPI documentation** - Auto-generated API spec at `/v3/api-docs` with
   Scalar UI at the root path
-- **Production-ready** - Virtual threads, response compression, graceful
-  shutdown, and security headers via `ServerConfig.optimized()`
+- **Production-ready** - Virtual threads, response compression, and graceful
+  shutdown via `ServerConfig.optimized()`, with API key authentication, rate
+  limiting, and security headers from spring-framework
 
 ## Getting Started
 
@@ -64,18 +65,26 @@ DATABASE_PASSWORD       # MariaDB password
 
 ### Installation
 
-This module depends on the [server-api](https://github.com/SkyBlock-Simplified/server-api)
-and [minecraft-api](https://github.com/SkyBlock-Simplified/minecraft-api) modules,
-declared as Maven coordinates. For local development, clone all repositories
-side by side and use Gradle composite builds:
+This module depends on the
+[spring-framework](https://github.com/simplified-dev/spring-framework) server
+framework, the [hypixel](https://github.com/simplified-api/hypixel),
+[mojang](https://github.com/simplified-api/mojang), and
+[skyblock](https://github.com/simplified-api/skyblock) API modules, the
+SkyBlock Simplified [api](https://github.com/skyblock-simplified/api) module,
+and the [client](https://github.com/simplified-dev/client),
+[gson-extras](https://github.com/simplified-dev/gson-extras), and
+[manager](https://github.com/simplified-dev/manager) libraries, each declared
+in `build.gradle.kts` as a JitPack coordinate pinned to a commit. A standalone
+build resolves them from JitPack:
 
 ```bash
-git clone https://github.com/SkyBlock-Simplified/api.git
-git clone https://github.com/SkyBlock-Simplified/minecraft-api.git
-git clone https://github.com/SkyBlock-Simplified/server-api.git
 git clone https://github.com/SkyBlock-Simplified/server.git
 cd server
 ```
+
+To build against local checkouts of those modules instead, include them in a
+Gradle composite build whose `dependencySubstitution` maps each coordinate onto
+the local project.
 
 Build the server:
 
@@ -94,6 +103,16 @@ Run the server:
 ```bash
 java -jar build/libs/server-0.1.0.jar
 ```
+
+> [!IMPORTANT]
+> `ServerConfig.optimized()` turns API key authentication on, so
+> spring-framework's `ApiKeySecurityConfig` requires an `ApiKeyStore` bean and
+> startup fails without one. This repository commits none: supply an
+> `ApiKeyStore` `@Bean` (`.gitignore` excludes
+> `src/main/java/dev/sbs/server/config/LocalApiKeyStoreConfig.java` for a local
+> one), or run with `--api.key.authentication.enabled=false` (or the
+> `API_KEY_AUTHENTICATION_ENABLED=false` environment variable) to get
+> `PermitAllSecurityConfig`, which permits every request.
 
 <details>
 <summary>Using as a dependency in another Gradle project</summary>
@@ -125,6 +144,10 @@ dependencies {
 </details>
 
 ## API Endpoints
+
+While API key authentication is on, every endpoint below requires a valid
+`X-API-Key` header. "No API key required" below means the upstream Hypixel
+endpoint needs no Hypixel API key.
 
 ### Mojang
 
@@ -190,43 +213,53 @@ these endpoints require an API key.
 ### Entry Point
 
 `SimplifiedServer` is the Spring Boot application class. It provides a `Gson`
-bean via `MinecraftApi.getGson()` that the framework's message converter
-configuration picks up automatically. Jackson auto-configuration remains enabled
-so SpringDoc can use it internally for OpenAPI spec generation. Server tuning is
-driven by `ServerConfig.optimized()`, which supplies all default properties
+bean via `ServerApi.getGson()` that spring-framework's `ServerWebConfig` picks
+up for its Gson message converter. Jackson auto-configuration remains enabled
+so SpringDoc can use it internally for OpenAPI spec generation. `main()`
+registers the Hypixel API key and the Mojang proxy's IPv6 prefix from the
+environment, and `ServerConfig.optimized()` supplies all default properties
 programmatically.
 
 ```java
-@SpringBootApplication(scanBasePackages = { "dev.sbs.server", "dev.sbs.serverapi" })
+@SpringBootApplication(scanBasePackages = { "dev.sbs.server", "dev.simplified.serverapi" })
 public class SimplifiedServer {
 
     @Bean
-    public Gson gson() {
-        return MinecraftApi.getGson();
+    public @NotNull Gson gson() {
+        return ServerApi.getGson();
     }
 
     public static void main(String[] args) {
+        ServerApi.getKeyManager().add("HYPIXEL_API_KEY", SystemUtil.getEnv("HYPIXEL_API_KEY"));
+        SystemUtil.getEnv("INET6_NETWORK_PREFIX").ifPresent(ServerApi::setInet6NetworkPrefix);
         SpringApplication application = new SpringApplication(SimplifiedServer.class);
-        application.setDefaultProperties(ServerConfig.optimized().toProperties());
+        application.setDefaultProperties(
+            ServerConfig.optimized()
+                .build()
+                .toProperties()
+        );
         application.run(args);
     }
+
 }
 ```
 
 > [!IMPORTANT]
-> The `scanBasePackages` array must include `dev.sbs.serverapi` for Spring to
-> discover the framework's configuration beans, interceptors, and error handler.
+> The `scanBasePackages` array must include `dev.simplified.serverapi` for
+> Spring to discover spring-framework's security, error handling, API
+> versioning, and web configuration.
 
 ### Controllers
 
-All controllers delegate to upstream Feign clients from `minecraft-api`:
+All controllers delegate to the upstream Feign contracts that `ServerApi`
+holds, and each carries a class-level `@PreAuthorize("isAuthenticated()")`:
 
 | Controller | Base Path | Upstream Client |
 |------------|-----------|-----------------|
-| `MojangController` | `/mojang/` | `MojangProxy` (IPv6 rotation pool) |
-| `HypixelController` | `/hypixel/` | `HypixelClient` via `HypixelEndpoint` |
-| `SkyBlockController` | `/skyblock/` | `HypixelClient` via `HypixelEndpoint` |
-| `ResourceController` | `/resources/` | `HypixelClient` via `HypixelEndpoint` |
+| `MojangController` | `/mojang/` | `MojangContract` via `ServerApi.getMojangProxy()` (IPv6 rotation) |
+| `HypixelController` | `/hypixel/` | `HypixelContract` via `ServerApi.getHypixelClient()` |
+| `SkyBlockController` | `/skyblock/` | `HypixelContract` via `ServerApi.getHypixelClient()` |
+| `ResourceController` | `/resources/` | `HypixelContract` via `ServerApi.getHypixelClient()` |
 
 ### API Documentation
 
@@ -242,8 +275,9 @@ All controllers delegate to upstream Feign clients from `minecraft-api`:
 
 ```
 server/
-├── src/main/java/dev/sbs/simplifiedserver/
+├── src/main/java/dev/sbs/server/
 │   ├── SimplifiedServer.java          # Spring Boot entry point with Gson bean
+│   ├── ServerApi.java                 # Gson, KeyManager, and the upstream clients
 │   ├── config/
 │   │   └── OpenApiConfig.java         # OpenAPI metadata (title, description, version)
 │   └── controller/
@@ -260,17 +294,25 @@ server/
 
 | Library | Version | Purpose |
 |---------|---------|---------|
-| Server API | 0.1.0 | Spring server framework (versioning, auth, error handling, config) |
-| Minecraft API | 0.1.0 | Mojang/Hypixel Feign clients and SkyBlock models |
-| SpringDoc OpenAPI Scalar | 2.8.16 | OpenAPI spec generation and Scalar UI |
-| Lombok | 1.18.36 | Boilerplate reduction |
-| simplified-annotations | 1.0.4 | Custom annotation processing |
+| spring-framework | JitPack commit | Spring server framework (versioning, API key auth, rate limiting, error handling, config) |
+| client | JitPack commit | Feign-based `Client` and `Proxy` with IPv6 subnet rotation |
+| gson-extras | JitPack commit | `GsonSettings` behind the shared `Gson` |
+| manager | JitPack commit | `KeyManager` holding the Hypixel API key |
+| hypixel | JitPack commit | Hypixel API contract and response models |
+| mojang | JitPack commit | Mojang API contract and response models |
+| skyblock | JitPack commit | SkyBlock data module |
+| api | JitPack commit | SkyBlock Simplified API contract |
+| SpringDoc OpenAPI Scalar | 3.0.3 | OpenAPI spec generation and Scalar UI |
+| simplified-annotations | 2.6.1 | Annotation processing (`@Getter`, `@NoArgsConstructor`) |
 | JUnit 5 | 5.11.4 | Testing |
 | Hamcrest | 2.2 | Test matchers |
 
+`build.gradle.kts` pins each JitPack dependency to a commit.
+
 > [!NOTE]
-> `server-api` transitively provides `api:0.1.0` and `spring-boot-starter-web` -
-> no need to declare them separately.
+> `spring-framework` exports the Spring Boot web, security, and actuator
+> starters, Bucket4j, Gson, and the Log4j2 API through its `api` scope - no
+> need to declare them separately.
 
 ## Contributing
 

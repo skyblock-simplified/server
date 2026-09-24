@@ -33,17 +33,17 @@ dependencies {
     testRuntimeOnly(libs.junit.jupiter.engine)
     testImplementation(libs.junit.platform.launcher)
 
-    // SpringDoc (implementation-specific, not in server-api)
+    // SpringDoc (declared here - spring-framework holds it compileOnly, so it is not transitive)
     implementation(libs.springdoc.openapi.scalar) {
         exclude(group = "org.jboss.logging", module = "jboss-logging")
     }
 
-    // Simplified infrastructure (formerly transitive via minecraft-api)
+    // Simplified-Dev infrastructure (client and gson-extras also reach here through spring-framework)
     implementation("com.github.simplified-dev:client") { version { strictly("2ced9a4") } }
     implementation("com.github.simplified-dev:gson-extras") { version { strictly("ed1d77e") } }
     implementation("com.github.simplified-dev:manager") { version { strictly("4aae941") } }
 
-    // Split minecraft-api modules
+    // Upstream API modules (Simplified-Api skyblock, mojang and hypixel; SkyBlock-Simplified api)
     implementation("com.github.simplified-api:skyblock") { version { strictly("d566734") } }
     implementation("com.github.simplified-api:mojang") { version { strictly("911319a") } }
     implementation("com.github.skyblock-simplified:api") { version { strictly("d94f1e9") } }
