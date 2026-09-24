@@ -3,7 +3,7 @@
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 See the root [`CLAUDE.md`](../CLAUDE.md) for cross-cutting patterns.
-See [`server-api/CLAUDE.md`](../server-api/CLAUDE.md) for the reusable Spring server framework (API versioning, API key auth, error handling, server config).
+See [`spring-framework/CLAUDE.md`](../../Simplified-Dev/spring-framework/CLAUDE.md) for the reusable Spring server framework (server config and the Gson message converter, Spring 7 path-segment API versioning, Spring Security API key auth with Bucket4j rate limiting, content-negotiated HTML or JSON error responses, and the SpringDoc customizers that document the key scheme).
 
 ## Build & Test
 
