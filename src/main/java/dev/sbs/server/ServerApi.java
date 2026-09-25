@@ -22,7 +22,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Server-local service locator that replaces the former {@code MinecraftApi} static holder.
+ * Server-local service locator.
  * <p>
  * Owns the {@link Gson} and {@link GsonSettings} used by the server for contract I/O, a
  * {@link KeyManager} that supplies the Hypixel API key header on demand, and the {@link Client}
