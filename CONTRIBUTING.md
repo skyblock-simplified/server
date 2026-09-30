@@ -34,7 +34,7 @@ For running the server locally:
 | Requirement | Notes |
 |-------------|-------|
 | Hypixel API key | Required for most Hypixel/SkyBlock endpoints |
-| Environment variables | `HYPIXEL_API_KEY`, and `INET6_NETWORK_PREFIX` for the `/mojang` endpoints, which throw without it |
+| Environment variables | `HYPIXEL_API_KEY`, and optionally `INET6_NETWORK_PREFIX`: with it, `/mojang` rotates IPv6 source addresses across the prefix in `/56` buckets; unset or blank, `/mojang` sends from the host's default address; a malformed prefix fails startup |
 | `ApiKeyStore` bean | Required while `api.key.authentication.enabled` is `true`, which `ServerConfig.optimized()` sets; keep a local one in `src/main/java/dev/sbs/server/config/LocalApiKeyStoreConfig.java`, which `.gitignore` excludes |
 
 ### Development Setup
