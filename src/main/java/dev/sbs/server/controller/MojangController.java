@@ -30,7 +30,9 @@ import java.util.UUID;
  *
  * <p>Provides player profile lookups, username resolution, skin properties,
  * and bulk username lookups. Delegates to the Mojang {@link Proxy} for upstream
- * calls with automatic IPv6 rotation to avoid rate limits.</p>
+ * calls, which rotates IPv6 source addresses to avoid rate limits when
+ * {@code INET6_NETWORK_PREFIX} names a prefix, and sends from the host's default
+ * address otherwise.</p>
  */
 @Tag(name = "Mojang", description = "Mojang API proxy endpoints")
 @RestController

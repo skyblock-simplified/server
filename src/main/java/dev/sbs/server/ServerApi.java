@@ -18,19 +18,18 @@ import dev.simplified.client.subnet.SubnetRotation;
 import dev.simplified.gson.GsonSettings;
 import dev.simplified.manager.KeyManager;
 import dev.simplified.manager.Manager;
+import dev.simplified.util.SystemUtil;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
 /**
  * Server-local service locator.
  * <p>
  * Owns the {@link Gson} and {@link GsonSettings} used by the server for contract I/O, a
  * {@link KeyManager} that supplies the Hypixel API key header on demand, and the {@link Client}
- * / {@link Proxy} instances for the Hypixel, SBS, and Mojang contracts. The Mojang
- * {@link Proxy} can be rebuilt with IPv6 source-address rotation via
- * {@link #setInet6NetworkPrefix(String)} once the runtime prefix is known. Persistence access
- * flows through {@code api.simplified.skyblock.SkyBlockData} directly - this locator does not
- * own it.
+ * / {@link Proxy} instances for the Hypixel, SBS, and Mojang contracts. The Mojang {@link Proxy}
+ * rotates IPv6 source addresses across the prefix {@code INET6_NETWORK_PREFIX} names, and sends
+ * from the host's default address when the variable is unset or blank. Persistence access flows
+ * through {@code api.simplified.skyblock.SkyBlockData} directly - this locator does not own it.
  */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class ServerApi {
@@ -57,52 +56,36 @@ public final class ServerApi {
     );
 
     /**
-     * The rate-limit-relevant subnet size for the Mojang rotation. A {@code /64} is the
-     * smallest block an IPv6 host is normally delegated, and the granularity an edge treats
-     * as one client, so budgets are tracked per {@code /64} rather than per address.
+     * The rate-limit-relevant subnet size for the Mojang rotation. Mojang buckets its per-IP
+     * limits by {@code /56} subnet for IPv6, so budgets are tracked per {@code /56}: addresses
+     * inside one {@code /56} share one budget, and rotation relieves the limit only by moving
+     * between {@code /56} subnets.
      */
-    private static final int MOJANG_BUCKET_PREFIX_LENGTH = 64;
-
-    private static volatile @Nullable Proxy<MojangContract> mojangProxy = null;
+    private static final int MOJANG_BUCKET_PREFIX_LENGTH = 56;
 
     /**
-     * Returns the shared Mojang proxy, which rotates outbound source addresses across the
-     * prefix supplied to {@link #setInet6NetworkPrefix(String)}.
-     *
-     * @return the shared Mojang proxy instance
-     * @throws IllegalStateException if no IPv6 prefix has been registered
+     * The shared Mojang proxy, rotating outbound source addresses across the IPv6 prefix the
+     * {@code INET6_NETWORK_PREFIX} environment variable names, and sending from the host's default
+     * source address when the variable is unset or blank.
      */
-    public static @NotNull Proxy<MojangContract> getMojangProxy() {
-        Proxy<MojangContract> proxy = mojangProxy;
-
-        if (proxy == null)
-            throw new IllegalStateException("setInet6NetworkPrefix must be called before the Mojang proxy is used");
-
-        return proxy;
-    }
-
-    /**
-     * Replaces the registered Mojang {@link Proxy} with one that rotates outbound source
-     * addresses across the given IPv6 CIDR prefix.
-     * <p>
-     * Intended to be called once at application startup once the runtime IPv6 prefix is known.
-     *
-     * @param cidrPrefix an IPv6 network prefix in CIDR notation (e.g. {@code "2000:444:33ff::/48"})
-     */
-    public static void setInet6NetworkPrefix(@NotNull String cidrPrefix) {
-        mojangProxy = Proxy.builder(
-                ClientConfig.builder(MojangContract.class, gsonSettings)
-                    .withErrorDecoder(MojangApiException::new)
-                    .build()
-            )
-            .withSubnetRotation(
-                SubnetRotation.builder()
-                    .sourcePrefix(cidrPrefix)
+    @Getter private static final @NotNull Proxy<MojangContract> mojangProxy = Proxy.builder(
+            ClientConfig.builder(MojangContract.class, gsonSettings)
+                .withErrorDecoder(MojangApiException::new)
+                .build()
+        )
+        .withSubnetRotation(
+            SystemUtil.getEnv("INET6_NETWORK_PREFIX")
+                .filter(cidr -> !cidr.isBlank())
+                .map(cidr -> SubnetRotation.builder()
+                    .sourcePrefix(cidr)
                     .bucketPrefixLength(MOJANG_BUCKET_PREFIX_LENGTH)
                     .build()
-            )
-            .withAvailability(client -> !client.isRateLimited(MojangDomain.MINECRAFT_SERVICES))
-            .build();
-    }
+                )
+        )
+        // The proxy serves the services lookups and the session server's profile reads,
+        // whose limits are separate buckets; a client is available while neither is spent.
+        .withAvailability(client -> !client.isRateLimited(MojangDomain.MINECRAFT_SERVICES)
+            && !client.isRateLimited(MojangDomain.MOJANG_SESSIONSERVER))
+        .build();
 
 }

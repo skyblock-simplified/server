@@ -1,6 +1,7 @@
 package dev.sbs.server;
 
 import com.google.gson.Gson;
+import dev.simplified.annotations.Log;
 import dev.simplified.serverapi.config.ServerConfig;
 import dev.simplified.serverapi.config.ServerWebConfig;
 import dev.simplified.serverapi.security.ApiKeySecurityConfig;
@@ -22,9 +23,10 @@ import org.springframework.context.annotation.Bean;
  * {@link ServerApi#getGson()}.
  *
  * <p>{@link #main(String[])} registers the {@code HYPIXEL_API_KEY} environment variable, when
- * set, with {@link ServerApi#getKeyManager()}, passes {@code INET6_NETWORK_PREFIX}, when set,
- * to {@link ServerApi#setInet6NetworkPrefix(String)}, and starts the application with the
- * {@link ServerConfig#optimized()} preset as its default properties.
+ * set, with {@link ServerApi#getKeyManager()}, starts the application with the
+ * {@link ServerConfig#optimized()} preset as its default properties, and then logs once whether
+ * the {@linkplain ServerApi#getMojangProxy() Mojang proxy} rotates across an IPv6 prefix or
+ * sends directly from the host's default address.
  *
  * <p>That preset sets {@code api.key.authentication.enabled=true}, so
  * {@link ApiKeySecurityConfig} loads and requires an {@link ApiKeyStore} bean - startup fails
@@ -34,6 +36,7 @@ import org.springframework.context.annotation.Bean;
  * outranks the default properties), which loads {@link PermitAllSecurityConfig} instead and
  * leaves every endpoint open.
  */
+@Log
 @SpringBootApplication(scanBasePackages = { "dev.sbs.server", "dev.simplified.serverapi" })
 public class SimplifiedServer {
 
@@ -44,7 +47,6 @@ public class SimplifiedServer {
 
     public static void main(String[] args) {
         ServerApi.getKeyManager().add("HYPIXEL_API_KEY", SystemUtil.getEnv("HYPIXEL_API_KEY"));
-        SystemUtil.getEnv("INET6_NETWORK_PREFIX").ifPresent(ServerApi::setInet6NetworkPrefix);
         SpringApplication application = new SpringApplication(SimplifiedServer.class);
         application.setDefaultProperties(
             ServerConfig.optimized()
@@ -52,6 +54,10 @@ public class SimplifiedServer {
                 .toProperties()
         );
         application.run(args);
+        log.info("Mojang proxy: {}", ServerApi.getMojangProxy()
+            .getRotation()
+            .map(rotation -> "rotating across " + rotation.sourcePrefix())
+            .orElse("direct"));
     }
 
 }

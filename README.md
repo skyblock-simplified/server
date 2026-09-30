@@ -52,11 +52,11 @@ SkyBlock resource definitions. Built on top of the
 | [JDK](https://adoptium.net/) | **21+** | Required (virtual threads) |
 | [Gradle](https://gradle.org/) | **9.4+** | Included via wrapper (`./gradlew`) |
 
-**Required environment variables** (for upstream API calls):
+**Environment variables** (for upstream API calls):
 
 ```
 HYPIXEL_API_KEY         # Hypixel API key (required for most Hypixel/SkyBlock endpoints)
-INET6_NETWORK_PREFIX    # IPv6 CIDR prefix the Mojang proxy rotates within (required by /mojang)
+INET6_NETWORK_PREFIX    # IPv6 CIDR prefix the Mojang proxy rotates within (optional; unset or blank, /mojang sends from the host's default address)
 ```
 
 ### Installation
@@ -212,11 +212,14 @@ them needs a Hypixel API key upstream.
 bean via `ServerApi.getGson()` that spring-framework's `ServerWebConfig` picks
 up for its Gson message converter. Jackson auto-configuration remains enabled
 so SpringDoc can use it internally for OpenAPI spec generation. `main()`
-registers the Hypixel API key and the Mojang proxy's IPv6 prefix from the
-environment, and `ServerConfig.optimized()` supplies all default properties
-programmatically.
+registers the Hypixel API key from the environment, `ServerConfig.optimized()`
+supplies all default properties programmatically, and once the application has
+started `main()` logs the Mojang proxy's mode - `rotating across <prefix>` or
+`direct`. `ServerApi` reads `INET6_NETWORK_PREFIX` itself when it builds that
+proxy.
 
 ```java
+@Log
 @SpringBootApplication(scanBasePackages = { "dev.sbs.server", "dev.simplified.serverapi" })
 public class SimplifiedServer {
 
@@ -227,7 +230,6 @@ public class SimplifiedServer {
 
     public static void main(String[] args) {
         ServerApi.getKeyManager().add("HYPIXEL_API_KEY", SystemUtil.getEnv("HYPIXEL_API_KEY"));
-        SystemUtil.getEnv("INET6_NETWORK_PREFIX").ifPresent(ServerApi::setInet6NetworkPrefix);
         SpringApplication application = new SpringApplication(SimplifiedServer.class);
         application.setDefaultProperties(
             ServerConfig.optimized()
@@ -235,6 +237,10 @@ public class SimplifiedServer {
                 .toProperties()
         );
         application.run(args);
+        log.info("Mojang proxy: {}", ServerApi.getMojangProxy()
+            .getRotation()
+            .map(rotation -> "rotating across " + rotation.sourcePrefix())
+            .orElse("direct"));
     }
 
 }
@@ -252,7 +258,7 @@ holds, and each carries a class-level `@PreAuthorize("isAuthenticated()")`:
 
 | Controller | Base Path | Upstream Client |
 |------------|-----------|-----------------|
-| `MojangController` | `/mojang/` | `MojangContract` via `ServerApi.getMojangProxy()` (IPv6 rotation) |
+| `MojangController` | `/mojang/` | `MojangContract` via `ServerApi.getMojangProxy()` (IPv6 rotation when `INET6_NETWORK_PREFIX` is set) |
 | `HypixelController` | `/hypixel/` | `HypixelContract` via `ServerApi.getHypixelClient()` |
 | `SkyBlockController` | `/skyblock/` | `HypixelContract` via `ServerApi.getHypixelClient()` |
 | `ResourceController` | `/resources/` | `HypixelContract` via `ServerApi.getHypixelClient()` |
