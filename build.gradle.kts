@@ -44,10 +44,10 @@ dependencies {
     implementation("com.github.simplified-dev:manager") { version { strictly("f70242e") } }
 
     // Upstream API modules (Simplified-Api skyblock, mojang and hypixel; SkyBlock-Simplified api)
-    implementation("com.github.simplified-api:skyblock") { version { strictly("95796a9") } }
-    implementation("com.github.simplified-api:mojang") { version { strictly("297a48c") } }
-    implementation("com.github.skyblock-simplified:api") { version { strictly("278b35a") } }
-    implementation("com.github.simplified-api:hypixel") { version { strictly("0eee297") } }
+    implementation("com.github.simplified-api:skyblock") { version { strictly("750e0e0") } }
+    implementation("com.github.simplified-api:mojang") { version { strictly("89a4344") } }
+    implementation("com.github.skyblock-simplified:api") { version { strictly("42cb781") } }
+    implementation("com.github.simplified-api:hypixel") { version { strictly("4f0ff4a") } }
 
     // Projects
     implementation("com.github.simplified-dev:spring-framework") { version { strictly("80980a7") } }
