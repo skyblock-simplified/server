@@ -39,18 +39,18 @@ dependencies {
     }
 
     // Simplified-Dev infrastructure (client and gson-extras also reach here through spring-framework)
-    implementation("com.github.simplified-dev:client") { version { strictly("566f6f6") } }
-    implementation("com.github.simplified-dev:gson-extras") { version { strictly("9026a04") } }
-    implementation("com.github.simplified-dev:manager") { version { strictly("f70242e") } }
+    implementation("com.github.simplified-dev:client") { version { strictly("2399b33") } }
+    implementation("com.github.simplified-dev:gson-extras") { version { strictly("be044c2") } }
+    implementation("com.github.simplified-dev:manager") { version { strictly("f14d7f5") } }
 
     // Upstream API modules (Simplified-Api skyblock, mojang and hypixel; SkyBlock-Simplified api)
-    implementation("com.github.simplified-api:skyblock") { version { strictly("ee544d7") } }
-    implementation("com.github.simplified-api:mojang") { version { strictly("80fc89f") } }
-    implementation("com.github.skyblock-simplified:api") { version { strictly("ccf0abc") } }
-    implementation("com.github.simplified-api:hypixel") { version { strictly("13de556") } }
+    implementation("com.github.simplified-api:skyblock") { version { strictly("cfda2be") } }
+    implementation("com.github.simplified-api:mojang") { version { strictly("b646f6c") } }
+    implementation("com.github.skyblock-simplified:api") { version { strictly("e800358") } }
+    implementation("com.github.simplified-api:hypixel") { version { strictly("c48c168") } }
 
     // Projects
-    implementation("com.github.simplified-dev:spring-framework") { version { strictly("3fcd6e7") } }
+    implementation("com.github.simplified-dev:spring-framework") { version { strictly("ea97ac8") } }
 }
 
 tasks {
